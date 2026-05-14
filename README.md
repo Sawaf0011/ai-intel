@@ -33,7 +33,7 @@ next. See the [Roadmap](#roadmap).
 | Postgres 16 + pgvector schema, Alembic migrations | ✅ Done |
 | Docker + docker-compose (db → migrate → app) | ✅ Done |
 | CI workflow scaffold | ✅ Done |
-| Source scrapers (GitHub, Reddit, Product Hunt, YC, HN) | 🚧 Planned |
+| Source scrapers (GitHub, Reddit, Product Hunt, YC, HN) | 🚧 GitHub done; others planned |
 | Embedding pipeline and vector search | 🚧 Planned |
 | RAG-powered chat with citations | 🚧 Planned |
 | Agent with tool calling (search, trending, compare, summarise) | 🚧 Planned |
@@ -122,6 +122,7 @@ pydantic-settings. Copy `.env.example` to `.env` to get started.
 | `POSTGRES_USER` | compose only | — | Postgres username (used by the `db` service) |
 | `POSTGRES_PASSWORD` | compose only | — | Postgres password |
 | `POSTGRES_DB` | compose only | — | Postgres database name |
+| `GITHUB_TOKEN` | scraper | — | GitHub personal access token (read:public_repo) |
 | `OPENAI_CHAT_MODEL` | — | `gpt-4o-mini` | Chat completion model |
 | `OPENAI_EMBED_MODEL` | — | `text-embedding-3-small` | Embedding model (1536 dims) |
 | `APP_ENV` | — | `development` | One of `development`, `staging`, `production` |
@@ -137,8 +138,13 @@ service hostname) automatically — you don't need to edit it.
 ai-intel/
 ├── src/ai_intel/           Core package
 │   ├── api/                FastAPI app and route definitions
+│   ├── cli.py              argparse CLI — `ai-intel-scrape` entry point
 │   ├── models/             SQLAlchemy ORM models (Item)
-│   ├── sources/            Scrapers — placeholder, Phase 6+
+│   ├── sources/            Scrapers
+│   │   ├── base.py         SourceItem dataclass + BaseSource ABC
+│   │   ├── github.py       GitHub search API scraper
+│   │   ├── repository.py   ItemRepository — upsert_many, most_recent_published_at
+│   │   └── runner.py       run_source orchestration
 │   ├── rag/                RAG pipeline — placeholder, Phase 7+
 │   ├── agent/              Tool-calling agent — placeholder, Phase 8+
 │   ├── mcp_server/         MCP server — placeholder, Phase 9+
@@ -211,6 +217,34 @@ fixtures work without explicit marks. The `patch_settings` fixture in
 never depend on a real `.env` file.
 
 No live database is required to run the current test suite.
+
+## Scrapers
+
+### GitHub
+
+Searches the GitHub API for repositories tagged with AI-related topics
+(`artificial-intelligence`, `machine-learning`, `llm`, `generative-ai`).
+Paginates up to 500 results per run, upserts into the `items` table, and
+automatically resumes from the last seen `pushed_at` on the next run.
+
+**Setup:** add your token to `.env`:
+
+```
+GITHUB_TOKEN=ghp_...
+```
+
+**Run:**
+
+```bash
+make scrape-github                  # resume from last seen date
+make scrape-github since=2026-01-01 # fetch everything pushed after this date
+```
+
+Or via the CLI directly:
+
+```bash
+uv run ai-intel-scrape --source github --since 2026-01-01
+```
 
 ## Roadmap
 

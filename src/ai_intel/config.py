@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # OpenAI — required, no default
     openai_api_key: str
 
+    # GitHub — required for the github scraper
+    github_token: str | None = None
+
     openai_chat_model: str = "gpt-4o-mini"
     openai_embed_model: str = "text-embedding-3-small"
 

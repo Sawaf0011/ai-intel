@@ -1,5 +1,5 @@
 .PHONY: install dev test lint format db-up db-down migrate migrate-down revision \
-        up up-build down logs logs-app ps migrate-docker clean
+        up up-build down logs logs-app ps migrate-docker clean scrape-github
 
 # Install all dependencies (including dev)
 install:
@@ -71,6 +71,10 @@ ps:
 # Run the migrate service manually against the compose db
 migrate-docker:
 	docker compose run --rm migrate
+
+# Scrape GitHub AI repos into the local database (requires GITHUB_TOKEN in .env)
+scrape-github:
+	uv run ai-intel-scrape --source github $(if $(since),--since $(since),)
 
 # Tear down everything and remove Python cache
 clean:
