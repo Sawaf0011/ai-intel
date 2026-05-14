@@ -1,4 +1,5 @@
-.PHONY: install dev test lint format db-up db-down migrate migrate-down revision clean
+.PHONY: install dev test lint format db-up db-down migrate migrate-down revision \
+        up up-build down logs logs-app ps migrate-docker clean
 
 # Install all dependencies (including dev)
 install:
@@ -25,9 +26,9 @@ format:
 db-up:
 	docker compose up -d db
 
-# Stop and remove Postgres container (data volume preserved)
+# Stop all compose services (volume preserved)
 db-down:
-	docker compose stop db
+	docker compose down
 
 # Apply all pending Alembic migrations
 migrate:
@@ -40,6 +41,36 @@ migrate-down:
 # Generate a new autogenerate migration: make revision m="your message"
 revision:
 	uv run alembic revision --autogenerate -m "$(m)"
+
+# --- Docker Compose targets ---
+
+# Start the full stack in the background
+up:
+	docker compose up -d
+
+# Rebuild images and start the full stack
+up-build:
+	docker compose up -d --build
+
+# Stop and remove all containers (volume preserved)
+down:
+	docker compose down
+
+# Tail logs from all services
+logs:
+	docker compose logs -f
+
+# Tail logs from the app service only
+logs-app:
+	docker compose logs -f app
+
+# Show running compose services and their health
+ps:
+	docker compose ps
+
+# Run the migrate service manually against the compose db
+migrate-docker:
+	docker compose run --rm migrate
 
 # Tear down everything and remove Python cache
 clean:

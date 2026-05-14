@@ -69,6 +69,25 @@ tests/              pytest suite
 scripts/            Dev convenience scripts
 ```
 
+## Run with Docker
+
+```bash
+cp .env.example .env          # then set OPENAI_API_KEY
+docker compose up -d --build  # builds image, starts db → migrate → app
+curl http://localhost:8000/health
+```
+
+`docker compose up` brings up three services in dependency order:
+1. **db** — Postgres 16 + pgvector (waits until healthy)
+2. **migrate** — runs `alembic upgrade head`, then exits (0)
+3. **app** — FastAPI on port 8000 (starts only after migrate completes)
+
+### Compose service dependency order
+
+```
+db (healthy) ──► migrate (completed_successfully) ──► app (running)
+```
+
 ## Architecture Overview
 
 _To be expanded as the system grows._
