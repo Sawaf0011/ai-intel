@@ -44,6 +44,15 @@ make migrate && make dev
 
 The API will be available at `http://localhost:8000`. Check `http://localhost:8000/health`.
 
+### Running the API without `make`
+
+```bash
+cp .env.example .env
+# fill in OPENAI_API_KEY at minimum
+uv run uvicorn ai_intel.api.main:app --reload
+# visit http://localhost:8000/health
+```
+
 ## Project Layout
 
 ```
