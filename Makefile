@@ -1,4 +1,4 @@
-.PHONY: install dev test lint format db-up db-down migrate clean
+.PHONY: install dev test lint format db-up db-down migrate migrate-down revision clean
 
 # Install all dependencies (including dev)
 install:
@@ -32,6 +32,14 @@ db-down:
 # Apply all pending Alembic migrations
 migrate:
 	uv run alembic upgrade head
+
+# Roll back one migration
+migrate-down:
+	uv run alembic downgrade -1
+
+# Generate a new autogenerate migration: make revision m="your message"
+revision:
+	uv run alembic revision --autogenerate -m "$(m)"
 
 # Tear down everything and remove Python cache
 clean:
