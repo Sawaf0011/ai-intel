@@ -7,6 +7,7 @@ from ai_intel.config import get_settings
 from ai_intel.db import session_factory
 from ai_intel.embeddings.pipeline import run_embedding_pipeline
 from ai_intel.sources.github import GitHubSource
+from ai_intel.sources.hackernews import HackerNewsSource
 from ai_intel.sources.runner import run_source
 
 
@@ -23,6 +24,8 @@ async def _scrape(source_name: str, since: datetime | None) -> None:
         if not settings.github_token:
             raise SystemExit("GITHUB_TOKEN is required for the github source")
         source = GitHubSource(settings.github_token)
+    elif source_name == "hackernews":
+        source = HackerNewsSource()
     else:
         raise SystemExit(f"Unknown source: {source_name!r}")
 
@@ -54,7 +57,7 @@ def main() -> None:
     scrape_parser.add_argument(
         "--source",
         required=True,
-        choices=["github"],
+        choices=["github", "hackernews"],
         help="Data source to scrape",
     )
     scrape_parser.add_argument(
