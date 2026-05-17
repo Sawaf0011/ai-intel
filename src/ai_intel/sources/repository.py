@@ -29,7 +29,7 @@ class ItemRepository:
             }
             for item in items
         ]
-        stmt = insert(Item).values(rows)
+        stmt = insert(Item.__table__).values(rows)
         stmt = stmt.on_conflict_do_update(
             index_elements=["id"],
             set_={

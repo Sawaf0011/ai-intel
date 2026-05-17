@@ -18,8 +18,9 @@ logger = logging.getLogger(__name__)
 
 _SEARCH_URL = "https://api.github.com/search/repositories"
 _QUERY = (
-    "topic:artificial-intelligence OR topic:machine-learning "
-    "OR topic:llm OR topic:generative-ai"
+    "topic:llm fork:false archived:false stars:>20",
+    "topic:generative-ai fork:false archived:false stars:>20",
+    "topic:machine-learning fork:false archived:false stars:>20",
 )
 _PER_PAGE = 100
 _MAX_PAGES = 5
@@ -63,11 +64,9 @@ class GitHubSource(BaseSource):
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )
-    async def _fetch_page(self, page: int, pushed_after: str | None) -> dict:
+    async def _fetch_page(self, page: int, query: str) -> dict:
         client = await self._get_client()
-        query = _QUERY
-        if pushed_after:
-            query += f" pushed:>{pushed_after}"
+
         response = await client.get(
             _SEARCH_URL,
             params={
@@ -78,15 +77,26 @@ class GitHubSource(BaseSource):
                 "page": page,
             },
         )
-        # On rate limit: sleep until reset, then raise so tenacity retries
+
         if response.status_code in (403, 429):
             remaining = int(response.headers.get("X-RateLimit-Remaining", 1))
+
             if remaining == 0:
                 reset_ts = int(response.headers.get("X-RateLimit-Reset", 0))
-                wait_s = max(reset_ts - int(datetime.now(UTC).timestamp()), 1)
-                logger.warning("GitHub rate limit hit; waiting %ds for reset", wait_s)
+                wait_s = max(
+                    reset_ts - int(datetime.now(UTC).timestamp()),
+                    1,
+                )
+
+                logger.warning(
+                    "GitHub rate limit hit; waiting %ds for reset",
+                    wait_s,
+                )
+
                 await asyncio.sleep(wait_s)
+
         response.raise_for_status()
+
         return response.json()
 
     def _to_item(self, repo: dict) -> SourceItem:
@@ -113,22 +123,40 @@ class GitHubSource(BaseSource):
 
     async def fetch(self, *, since: datetime | None = None) -> Sequence[SourceItem]:
         pushed_after = since.strftime("%Y-%m-%d") if since else None
+
         items: list[SourceItem] = []
+
         try:
-            for page in range(1, _MAX_PAGES + 1):
-                data = await self._fetch_page(page, pushed_after)
-                repos = data.get("items", [])
-                items.extend(self._to_item(r) for r in repos)
-                logger.info(
-                    "GitHub page %d: %d repos (total: %d)",
-                    page,
-                    len(repos),
-                    len(items),
-                )
-                if len(repos) < _PER_PAGE:
-                    break
+            for base_query in _QUERY:
+                query = base_query
+
+                if pushed_after:
+                    query += f" pushed:>{pushed_after}"
+
+                for page in range(1, _MAX_PAGES + 1):
+                    data = await self._fetch_page(page, query)
+
+                    repos = data.get("items", [])
+
+                    items.extend(self._to_item(r) for r in repos)
+
+                    logger.info(
+                        "GitHub query=%s page=%d repos=%d total=%d",
+                        base_query,
+                        page,
+                        len(repos),
+                        len(items),
+                    )
+
+                    if len(repos) < _PER_PAGE:
+                        break
+
+            # Deduplicate repositories
+            unique_items = {item.id: item for item in items}
+
+            return list(unique_items.values())
+
         finally:
             if self._owns_client and self._client is not None:
                 await self._client.aclose()
                 self._client = None
-        return items

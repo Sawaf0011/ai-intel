@@ -1,5 +1,5 @@
 .PHONY: install dev test lint format db-up db-down migrate migrate-down revision \
-        up up-build down logs logs-app ps migrate-docker clean scrape-github
+        up up-build down logs logs-app ps migrate-docker clean scrape-github embed
 
 # Install all dependencies (including dev)
 install:
@@ -74,7 +74,11 @@ migrate-docker:
 
 # Scrape GitHub AI repos into the local database (requires GITHUB_TOKEN in .env)
 scrape-github:
-	uv run ai-intel-scrape --source github $(if $(since),--since $(since),)
+	uv run python -m ai_intel.cli scrape --source github $(if $(since),--since $(since),)
+
+# Generate vector embeddings for all un-embedded items
+embed:
+	uv run python -m ai_intel.cli embed
 
 # Tear down everything and remove Python cache
 clean:

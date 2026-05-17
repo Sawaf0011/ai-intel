@@ -34,7 +34,8 @@ next. See the [Roadmap](#roadmap).
 | Docker + docker-compose (db → migrate → app) | ✅ Done |
 | CI workflow scaffold | ✅ Done |
 | Source scrapers (GitHub, Reddit, Product Hunt, YC, HN) | 🚧 GitHub done; others planned |
-| Embedding pipeline and vector search | 🚧 Planned |
+| Embedding pipeline (OpenAI text-embedding-3-small + HNSW index) | ✅ Done |
+| Vector search (semantic RAG queries) | 🚧 Planned (Phase 9) |
 | RAG-powered chat with citations | 🚧 Planned |
 | Agent with tool calling (search, trending, compare, summarise) | 🚧 Planned |
 | MCP server exposing the agent tools | 🚧 Planned |
@@ -246,14 +247,37 @@ Or via the CLI directly:
 uv run ai-intel-scrape --source github --since 2026-01-01
 ```
 
+## Embeddings
+
+After scraping, generate vector embeddings so items become semantically searchable:
+
+    make embed
+
+This embeds every item that doesn't yet have an embedding using OpenAI
+text-embedding-3-small (1536 dimensions). Re-running only embeds new items.
+
+To force re-embedding of all items:
+
+    uv run python -m ai_intel.cli embed --force
+
+To embed a small batch (useful for testing):
+
+    uv run python -m ai_intel.cli embed --limit 20
+
+Check embedding coverage:
+
+    docker compose exec db psql -U aiintel -d aiintel -c \
+      "SELECT COUNT(*) FILTER (WHERE embedding IS NOT NULL) AS embedded, \
+       COUNT(*) AS total FROM items;"
+
 ## Roadmap
 
 In priority order:
 
 - **Source scrapers** — daily ingestion from GitHub trending, Reddit r/MachineLearning
   and r/artificial, Product Hunt, Y Combinator new companies, Hacker News
-- **Embedding pipeline** — batch embed items with `text-embedding-3-small`, store in
-  the `embedding` vector column, add HNSW index
+- **Embedding pipeline** — ✅ batch embed items with `text-embedding-3-small`, store in
+  the `embedding` vector column, HNSW index created
 - **RAG-powered chat** — semantic search endpoint, context assembly, cited answers
 - **Agent with tool calling** — structured tools: keyword search, trending items,
   source comparison, thread summarisation
