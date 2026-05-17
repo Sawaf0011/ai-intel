@@ -36,9 +36,9 @@ next. See the [Roadmap](#roadmap).
 | Source scrapers (GitHub, HN, YC) | ✅ Done (1446 GitHub repos, 26 HN stories, 200 YC companies) |
 | Source scrapers (Reddit, Product Hunt) | 🚧 Out of scope for this phase |
 | Embedding pipeline (OpenAI text-embedding-3-small + HNSW index) | ✅ Done |
-| Vector search (semantic RAG queries) | 🚧 Planned (Phase 9) |
-| RAG-powered chat with citations | 🚧 Planned |
-| Agent with tool calling (search, trending, compare, summarise) | 🚧 Planned |
+| Vector search (semantic RAG queries) | ✅ Done |
+| RAG-powered chat with citations | ✅ Done |
+| Agent with tool calling (search, trending, compare, summarise) | ✅ Done |
 | MCP server exposing the agent tools | 🚧 Planned |
 | Observability dashboard (scores, cost, latency, reasoning paths) | 🚧 Planned |
 | Automated daily digest | 🚧 Planned |
@@ -149,10 +149,10 @@ ai-intel/
 │   │   ├── ycombinator.py  YC Algolia scraper (runtime credential extraction)
 │   │   ├── repository.py   ItemRepository — upsert_many, most_recent_published_at
 │   │   └── runner.py       run_source orchestration
-│   ├── rag/                RAG pipeline — placeholder, Phase 7+
-│   ├── agent/              Tool-calling agent — placeholder, Phase 8+
-│   ├── mcp_server/         MCP server — placeholder, Phase 9+
-│   ├── observability/      Dashboard backend — placeholder, Phase 10+
+│   ├── retrieval/          Semantic search service + four agent tools
+│   ├── agent/              OpenAI tool-calling agent (IntelligenceAgent)
+│   ├── mcp_server/         MCP server — placeholder
+│   ├── observability/      Dashboard backend — placeholder
 │   ├── config.py           pydantic-settings: loads .env, typed fields
 │   └── db.py               Async engine, session factory, DeclarativeBase
 ├── alembic/                Alembic migrations (async env.py)
@@ -186,6 +186,7 @@ ai-intel/
 | `make migrate` | Apply pending migrations locally (requires `make db-up`) |
 | `make migrate-docker` | Apply pending migrations inside the compose network |
 | `make clean` | Tear down stack + remove volumes and Python caches |
+| `make ask q="..."` | Ask a natural-language question against the knowledge base |
 
 ### Database migrations
 
@@ -293,6 +294,82 @@ Check embedding coverage:
       "SELECT COUNT(*) FILTER (WHERE embedding IS NOT NULL) AS embedded, \
        COUNT(*) AS total FROM items;"
 
+## Querying
+
+Once items are scraped and embedded, query the knowledge base in natural language.
+The agent uses OpenAI tool calling to search, retrieve trending items, and compare
+sources — all answers are grounded in the scraped data (no training-data fabrication).
+
+### CLI
+
+```bash
+make ask q="What are the most popular open source LLM frameworks?"
+```
+
+Example output:
+
+```
+According to GitHub repositories in the knowledge base, the most popular open
+source LLM frameworks include:
+
+- A GitHub repository named "langchain-ai/langchain" describes itself as
+  "Build context-aware reasoning applications"
+- A GitHub repository named "run-llama/llama_index" describes itself as
+  "LlamaIndex is a data framework for your LLM applications"
+- ...
+
+Sources:
+  [github] langchain-ai/langchain — https://github.com/langchain-ai/langchain
+  [github] run-llama/llama_index — https://github.com/run-llama/llama_index
+
+Tools used: search_knowledge_base — 2 iteration(s)
+```
+
+Or use the CLI directly:
+
+```bash
+uv run python -m ai_intel.cli ask "What YC AI startups are in the latest batch?"
+```
+
+### API
+
+```bash
+curl -s -X POST http://localhost:8001/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What are trending AI agent frameworks on GitHub?"}' \
+  | python -m json.tool
+```
+
+Response shape:
+
+```json
+{
+  "answer": "According to GitHub repositories...",
+  "sources": [
+    {"id": "github:user/repo", "source": "github", "title": "repo", "url": "..."}
+  ],
+  "tool_calls": [
+    {"name": "get_trending", "args": {"source": "github"}}
+  ],
+  "iterations": 2,
+  "hit_iteration_limit": false
+}
+```
+
+A 422 is returned for an empty or missing `question` field. A 500 is returned if
+the agent errors (e.g. OpenAI API unavailable).
+
+### Agent tools
+
+The agent has access to four tools it selects autonomously:
+
+| Tool | Description |
+|---|---|
+| `search_knowledge_base` | Semantic similarity search across all (or one) source |
+| `get_trending` | Top items from one source ranked by stars / score / recency |
+| `get_item_details` | Full record for a single item by ID |
+| `compare_sources` | Same query across GitHub, HN, and YC, grouped by source |
+
 ## Roadmap
 
 In priority order:
@@ -301,9 +378,9 @@ In priority order:
   (200 AI companies); Reddit and Product Hunt are out of scope for this phase
 - **Embedding pipeline** — ✅ batch embed items with `text-embedding-3-small`, store in
   the `embedding` vector column, HNSW index created
-- **RAG-powered chat** — semantic search endpoint, context assembly, cited answers
-- **Agent with tool calling** — structured tools: keyword search, trending items,
-  source comparison, thread summarisation
+- **RAG-powered chat** — ✅ semantic search + cited answers via the `/query` endpoint
+- **Agent with tool calling** — ✅ four structured tools: keyword search, trending
+  items, source comparison, item deep-dive; `POST /query` + `make ask` CLI
 - **MCP server** — expose the agent tools via Anthropic's MCP protocol
 - **Observability dashboard** — per-query metrics: retrieval scores, token costs,
   latency breakdown, full reasoning chain
