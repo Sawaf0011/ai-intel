@@ -3,6 +3,7 @@ import asyncio
 import logging
 from datetime import UTC, datetime
 
+from ai_intel.agent.agent import IntelligenceAgent
 from ai_intel.config import get_settings
 from ai_intel.db import session_factory
 from ai_intel.embeddings.pipeline import run_embedding_pipeline
@@ -43,6 +44,22 @@ async def _embed(force: bool, limit: int | None) -> None:
     print(f"Done — embedded {result.embedded} items ({result.total_seen} seen)")
 
 
+async def _ask(question: str) -> None:
+    agent = IntelligenceAgent()
+    result = await agent.answer(question)
+
+    print(result.answer)
+
+    if result.sources:
+        print("\nSources:")
+        for s in result.sources:
+            print(f"  [{s.get('source', '?')}] {s.get('title', '?')} — {s.get('url', '?')}")
+
+    tools_used = ", ".join(tc["name"] for tc in result.tool_calls)
+    limit_note = " (hit iteration limit)" if result.hit_iteration_limit else ""
+    print(f"\nTools used: {tools_used or 'none'} — {result.iterations} iteration(s){limit_note}")
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
     parser = argparse.ArgumentParser(
@@ -71,6 +88,16 @@ def main() -> None:
         help="Only fetch items updated after this date (default: resume from last seen)",
     )
 
+    # --- ask subcommand ---
+    ask_parser = subparsers.add_parser(
+        "ask",
+        help="Ask a natural-language question about the AI startup ecosystem",
+    )
+    ask_parser.add_argument(
+        "question",
+        help="The question to answer (e.g. 'What AI agent frameworks are trending?')",
+    )
+
     # --- embed subcommand ---
     embed_parser = subparsers.add_parser(
         "embed",
@@ -94,6 +121,8 @@ def main() -> None:
         asyncio.run(_scrape(args.source, args.since))
     elif args.command == "embed":
         asyncio.run(_embed(force=args.force, limit=args.limit))
+    elif args.command == "ask":
+        asyncio.run(_ask(args.question))
 
 
 if __name__ == "__main__":

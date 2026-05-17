@@ -1,5 +1,5 @@
 .PHONY: install dev test lint format db-up db-down migrate migrate-down revision \
-        up up-build down logs logs-app ps migrate-docker clean scrape-github scrape-hn scrape-yc embed
+        up up-build down logs logs-app ps migrate-docker clean scrape-github scrape-hn scrape-yc embed ask
 
 # Install all dependencies (including dev)
 install:
@@ -87,6 +87,10 @@ scrape-yc:
 # Generate vector embeddings for all un-embedded items
 embed:
 	uv run python -m ai_intel.cli embed
+
+# Ask a natural-language question: make ask q="your question"
+ask:
+	uv run python -m ai_intel.cli ask "$(q)"
 
 # Tear down everything and remove Python cache
 clean:
