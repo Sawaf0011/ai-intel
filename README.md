@@ -33,7 +33,8 @@ next. See the [Roadmap](#roadmap).
 | Postgres 16 + pgvector schema, Alembic migrations | ✅ Done |
 | Docker + docker-compose (db → migrate → app) | ✅ Done |
 | CI workflow scaffold | ✅ Done |
-| Source scrapers (GitHub, Reddit, Product Hunt, YC, HN) | 🚧 GitHub done; others planned |
+| Source scrapers (GitHub, HN, YC) | ✅ Done (1446 GitHub repos, 26 HN stories, 200 YC companies) |
+| Source scrapers (Reddit, Product Hunt) | 🚧 Out of scope for this phase |
 | Embedding pipeline (OpenAI text-embedding-3-small + HNSW index) | ✅ Done |
 | Vector search (semantic RAG queries) | 🚧 Planned (Phase 9) |
 | RAG-powered chat with citations | 🚧 Planned |
@@ -144,6 +145,8 @@ ai-intel/
 │   ├── sources/            Scrapers
 │   │   ├── base.py         SourceItem dataclass + BaseSource ABC
 │   │   ├── github.py       GitHub search API scraper
+│   │   ├── hackernews.py   HN Firebase API scraper (AI keyword filter)
+│   │   ├── ycombinator.py  YC Algolia scraper (runtime credential extraction)
 │   │   ├── repository.py   ItemRepository — upsert_many, most_recent_published_at
 │   │   └── runner.py       run_source orchestration
 │   ├── rag/                RAG pipeline — placeholder, Phase 7+
@@ -221,6 +224,10 @@ No live database is required to run the current test suite.
 
 ## Scrapers
 
+All three scrapers implement the `BaseSource` interface — `fetch(*, since)` returns
+`Sequence[SourceItem]` and `runner.py` handles upsert and resume logic generically.
+Each source is idempotent: re-running resumes from the last seen `published_at`.
+
 ### GitHub
 
 Searches the GitHub API for repositories tagged with AI-related topics
@@ -241,10 +248,26 @@ make scrape-github                  # resume from last seen date
 make scrape-github since=2026-01-01 # fetch everything pushed after this date
 ```
 
-Or via the CLI directly:
+### Hacker News
+
+Fetches top + best stories from the HN Firebase REST API and filters
+client-side to AI-relevant titles using a two-tier keyword matcher
+(word-boundary matching for short acronyms like `ai`, `llm`, `gpt`).
 
 ```bash
-uv run ai-intel-scrape --source github --since 2026-01-01
+make scrape-hn
+```
+
+### Y Combinator
+
+Queries the Algolia search index backing `ycombinator.com/companies` with
+`facetFilters: [["tags:Artificial Intelligence"]]`. Algolia credentials
+(app ID + search key) are extracted at runtime from `window.AlgoliaOpts`
+in the page HTML — they stay current without code changes if YC rotates
+the public key.
+
+```bash
+make scrape-yc
 ```
 
 ## Embeddings
@@ -274,8 +297,8 @@ Check embedding coverage:
 
 In priority order:
 
-- **Source scrapers** — daily ingestion from GitHub trending, Reddit r/MachineLearning
-  and r/artificial, Product Hunt, Y Combinator new companies, Hacker News
+- **Source scrapers** — ✅ GitHub (1446 repos), Hacker News (26 AI stories), Y Combinator
+  (200 AI companies); Reddit and Product Hunt are out of scope for this phase
 - **Embedding pipeline** — ✅ batch embed items with `text-embedding-3-small`, store in
   the `embedding` vector column, HNSW index created
 - **RAG-powered chat** — semantic search endpoint, context assembly, cited answers
