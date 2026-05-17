@@ -9,6 +9,7 @@ from ai_intel.embeddings.pipeline import run_embedding_pipeline
 from ai_intel.sources.github import GitHubSource
 from ai_intel.sources.hackernews import HackerNewsSource
 from ai_intel.sources.runner import run_source
+from ai_intel.sources.ycombinator import YCombinatorSource
 
 
 def _parse_date(value: str) -> datetime:
@@ -26,6 +27,8 @@ async def _scrape(source_name: str, since: datetime | None) -> None:
         source = GitHubSource(settings.github_token)
     elif source_name == "hackernews":
         source = HackerNewsSource()
+    elif source_name == "ycombinator":
+        source = YCombinatorSource()
     else:
         raise SystemExit(f"Unknown source: {source_name!r}")
 
@@ -57,7 +60,7 @@ def main() -> None:
     scrape_parser.add_argument(
         "--source",
         required=True,
-        choices=["github", "hackernews"],
+        choices=["github", "hackernews", "ycombinator"],
         help="Data source to scrape",
     )
     scrape_parser.add_argument(

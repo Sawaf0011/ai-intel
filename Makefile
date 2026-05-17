@@ -1,5 +1,5 @@
 .PHONY: install dev test lint format db-up db-down migrate migrate-down revision \
-        up up-build down logs logs-app ps migrate-docker clean scrape-github scrape-hn embed
+        up up-build down logs logs-app ps migrate-docker clean scrape-github scrape-hn scrape-yc embed
 
 # Install all dependencies (including dev)
 install:
@@ -79,6 +79,10 @@ scrape-github:
 # Scrape Hacker News AI stories
 scrape-hn:
 	uv run python -m ai_intel.cli scrape --source hackernews
+
+# Scrape Y Combinator AI companies
+scrape-yc:
+	uv run python -m ai_intel.cli scrape --source ycombinator
 
 # Generate vector embeddings for all un-embedded items
 embed:
