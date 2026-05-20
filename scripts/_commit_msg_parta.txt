@@ -1,0 +1,31 @@
+feat: RAG retrieval service and agent tool functions
+
+Adds the retrieval package that turns embedded items into a queryable
+intelligence layer. No LLM required — all retrieval is deterministic.
+
+src/ai_intel/retrieval/search.py:
+- SearchResult dataclass (slots=True): id, source, title, url, content,
+  metadata, similarity (cosine similarity = 1 - pgvector distance)
+- SearchService: takes AsyncSession, embeds query via Embedder, queries
+  the HNSW cosine index, returns results ordered by similarity desc
+
+src/ai_intel/retrieval/tools.py — four agent tool functions:
+- search_knowledge_base: semantic search, optional source filter,
+  content truncated to 300 chars, ValueError on invalid source
+- get_trending: pure SQL ranked by stars (github), score (hackernews),
+  or launched_at desc (ycombinator); NULLs sorted last via coalesce
+- get_item_details: full row by item_id, returns None if not found
+- compare_sources: runs semantic_search once per source, dict by source
+  Each tool has docstrings written for LLM tool-calling consumption.
+
+tests/retrieval/ (24 tests, 0 real API/DB calls):
+- test_search.py: SearchResult, similarity arithmetic (1-distance),
+  field mapping, multi-result ordering, empty DB, embed_texts contract
+- test_tools.py: _truncate, source validation ValueError, content
+  truncation, result shape, get_item_details None, compare_sources keys
+
+Verified against live DB (1672 items): agent frameworks retrieved at
+top for "AI agent frameworks", source filter correct, get_trending
+ordered by stars/score, compare_sources returns all three sources.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>

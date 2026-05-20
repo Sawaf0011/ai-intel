@@ -1,0 +1,44 @@
+feat: tool-calling intelligence agent with /query endpoint and ask CLI
+
+Adds the agent layer that turns the Part A retrieval tools into a
+natural-language query interface. The agent uses OpenAI tool calling
+to answer questions grounded exclusively in the knowledge base.
+
+src/ai_intel/agent/agent.py:
+- IntelligenceAgent: async OpenAI tool-calling loop over the four
+  Part A tools. Dispatches via getattr(_tools, name) so test patches
+  work correctly. MAX_ITERATIONS=6 bounds the loop.
+- AgentResponse dataclass: answer, tool_calls (ordered trace),
+  sources (deduplicated {id, source, title, url}), iterations,
+  hit_iteration_limit
+- TOOL_SCHEMAS: hand-written JSON schemas for all four tools with
+  docstrings written for LLM tool-selection
+- System prompt enforces: grounding (tools only, no training knowledge),
+  attribution (scraped content cited as raw signal, not verified fact),
+  citation (title + URL always included)
+
+src/ai_intel/api/routes/query.py:
+- POST /query: QueryRequest (min_length=1 -> 422 on empty), QueryResponse
+- 500 with clean message on agent error; /health untouched
+
+src/ai_intel/cli.py: ask subcommand added (positional question arg);
+prints answer, sources list, tool trace line
+
+Makefile: ask target added (make ask q="your question")
+
+tests/agent/ (20 tests, 0 real API/DB calls):
+- test_agent.py: _extract_sources (5 cases), AgentResponse defaults,
+  tool-call-then-final-text loop, immediate final text, MAX_ITERATIONS
+  enforcement, get_trending/compare_sources dispatch, unknown tool
+  graceful handling, source deduplication
+- test_query_endpoint.py: happy path shape, empty tool_calls, 422
+  (empty/missing/bad content-type), 500 on agent error, /health intact
+
+Verified end-to-end against live DB + real OpenAI API:
+- POST /query returns correct JSON shape; 422 on empty question
+- "AI agent frameworks" -> get_trending, cites LangChain/AutoGPT/Langflow
+- "YC AI startups" -> get_trending(ycombinator), Spring 2026 batch
+- "compare AI safety" -> search_knowledge_base x3, all sources present
+- "Apple WWDC" -> searched, found nothing relevant, no fabrication
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
